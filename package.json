@@ -2,16 +2,12 @@
   "name": "ai-anti-frust-prompt-cache-master-edition",
   "version": "8.4.0",
   "private": true,
-  "description": "Universal AI Anti-Frust: Master Edition – Backup, Restore & Cursor-Sync userscript",
+  "description": "Universal AI Anti-Frust: Master Edition \u2013 Backup, Restore & Cursor-Sync userscript",
   "scripts": {
     "lint": "eslint .",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "validate:meta": "node scripts/validate-meta.js"
-  },
-  "jest": {
-    "testEnvironment": "jsdom",
-    "setupFiles": ["./tests/setup.js"]
   },
   "devDependencies": {
     "eslint": "^8.56.0",

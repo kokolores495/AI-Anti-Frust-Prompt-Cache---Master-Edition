@@ -78,7 +78,6 @@ describe('setNativeValue', () => {
         const textarea = document.createElement('textarea');
         const proto = Object.getPrototypeOf(textarea);
         const protoDesc = Object.getOwnPropertyDescriptor(proto, 'value');
-        const protoSetter = protoDesc.set;
 
         // Define a different instance setter
         const instanceSetter = jest.fn();
