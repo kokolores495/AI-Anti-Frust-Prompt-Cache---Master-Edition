@@ -19,6 +19,7 @@
 
     const STORAGE_KEY = 'ai_draft_backup_universal';
     const CURSOR_KEY = 'ai_cursor_pos_universal';
+    const LOG_PREFIX = '[AI Anti-Frust]';
 
     // CSS Injektion für den Lösch-Button (Umgeht Content-Security-Policy)
     GM_addStyle(`
@@ -78,29 +79,43 @@
 
     // Setzt Werte so, dass React/Vue sie erkennt (Trigger State Update)
     function setNativeValue(element, value) {
-        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
-        const prototype = Object.getPrototypeOf(element);
-        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+        if (!element) {
+            console.warn(LOG_PREFIX, 'setNativeValue called with null element');
+            return;
+        }
+        try {
+            const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
+            const prototype = Object.getPrototypeOf(element);
+            const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
 
-        if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
-            prototypeValueSetter.call(element, value);
-        } else if (valueSetter) {
-            valueSetter.call(element, value);
-        } else {
+            if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+                prototypeValueSetter.call(element, value);
+            } else if (valueSetter) {
+                valueSetter.call(element, value);
+            } else {
+                element.value = value;
+            }
+        } catch (e) {
+            console.warn(LOG_PREFIX, 'setNativeValue failed:', e.message);
             element.value = value;
         }
     }
 
     // Berechnet die absolute Cursor-Position im Text
     function getCursorPosition(el) {
-        if (isTextarea(el)) return el.selectionStart;
-        const selection = window.getSelection();
-        if (selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            const preCaretRange = range.cloneRange();
-            preCaretRange.selectNodeContents(el);
-            preCaretRange.setEnd(range.endContainer, range.endOffset);
-            return preCaretRange.toString().length;
+        if (!el) return 0;
+        try {
+            if (isTextarea(el)) return el.selectionStart || 0;
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(el);
+                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                return preCaretRange.toString().length;
+            }
+        } catch (e) {
+            console.warn(LOG_PREFIX, 'getCursorPosition failed:', e.message);
         }
         return 0;
     }
@@ -152,58 +167,68 @@
 
         // RESTORE LOGIK
         if (hasBackup && getFieldText(field).trim() === "" && !field.dataset.restored) {
-            const savedPos = clampCursorPos(
-                parseInt(safeStorageGet(CURSOR_KEY) || "0", 10),
-                savedText
-            );
+            try {
+                const savedPos = clampCursorPos(
+                    parseInt(safeStorageGet(CURSOR_KEY) || "0", 10),
+                    savedText
+                );
 
-            setFieldText(field, savedText);
-            field.dispatchEvent(new Event('input', { bubbles: true }));
-            field.focus();
+                setFieldText(field, savedText);
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.focus();
 
-            if (isTextarea(field)) {
-                field.setSelectionRange(savedPos, savedPos);
-            } else {
-                // Cursor-Wiederherstellung für ContentEditable (DOM Walker)
-                try {
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    let charCount = 0, nodeStack = [field], found = false;
-                    while (nodeStack.length > 0 && !found) {
-                        let node = nodeStack.pop();
-                        if (node.nodeType === 3) {
-                            const nextCount = charCount + node.length;
-                            if (savedPos <= nextCount) {
-                                range.setStart(node, savedPos - charCount);
-                                range.collapse(true);
-                                found = true;
+                if (isTextarea(field)) {
+                    field.setSelectionRange(savedPos, savedPos);
+                } else {
+                    // Cursor-Wiederherstellung für ContentEditable (DOM Walker)
+                    try {
+                        const range = document.createRange();
+                        const sel = window.getSelection();
+                        if (sel) {
+                            let charCount = 0, nodeStack = [field], found = false;
+                            while (nodeStack.length > 0 && !found) {
+                                let node = nodeStack.pop();
+                                if (node.nodeType === 3) {
+                                    const nextCount = charCount + node.length;
+                                    if (savedPos <= nextCount) {
+                                        range.setStart(node, savedPos - charCount);
+                                        range.collapse(true);
+                                        found = true;
+                                    }
+                                    charCount = nextCount;
+                                } else {
+                                    for (let i = node.childNodes.length - 1; i >= 0; i--) nodeStack.push(node.childNodes[i]);
+                                }
                             }
-                            charCount = nextCount;
-                        } else {
-                            for (let i = node.childNodes.length - 1; i >= 0; i--) nodeStack.push(node.childNodes[i]);
+                            if (!found) range.selectNodeContents(field), range.collapse(false);
+                            sel.removeAllRanges(); sel.addRange(range);
                         }
+                    } catch (_) {
+                        // Cursor restore failed — field content is still intact
                     }
-                    if (!found) range.selectNodeContents(field), range.collapse(false);
-                    sel.removeAllRanges(); sel.addRange(range);
-                } catch (_) {
-                    // Cursor restore failed — field content is still intact
                 }
+                field.dataset.restored = "true";
+            } catch (e) {
+                console.warn(LOG_PREFIX, 'Restore failed:', e.message);
             }
-            field.dataset.restored = "true";
         }
 
         // BACKUP LOGIK (Event Binding)
         if (!field.dataset.backupBound) {
             const saveAction = () => {
-                const text = getFieldText(field);
-                if (text.trim().length > 0) {
-                    if (safeStorageSet(STORAGE_KEY, text)) {
-                        safeStorageSet(CURSOR_KEY, getCursorPosition(field));
+                try {
+                    const text = getFieldText(field);
+                    if (text && text.trim().length > 0) {
+                        if (safeStorageSet(STORAGE_KEY, text)) {
+                            safeStorageSet(CURSOR_KEY, getCursorPosition(field));
+                        }
+                    } else {
+                        clearBackup();
                     }
-                } else {
-                    clearBackup();
+                    updateLogic();
+                } catch (e) {
+                    console.warn(LOG_PREFIX, 'Backup save failed:', e.message);
                 }
-                updateLogic();
             };
             field.addEventListener('input', saveAction);
             field.addEventListener('click', saveAction);
@@ -228,9 +253,13 @@
             clearBackup();
             const field = getInputField();
             if (field) {
-                setFieldText(field, "");
-                field.focus();
-                resetFieldState(field);
+                try {
+                    setFieldText(field, "");
+                    field.focus();
+                    resetFieldState(field);
+                } catch (e) {
+                    console.warn(LOG_PREFIX, 'Field clear failed:', e.message);
+                }
             } else {
                 updateLogic();
             }
@@ -239,17 +268,27 @@
 
     // Periodischer Check (falls UI nachgeladen wird)
     setInterval(() => {
-        if (!document.getElementById('clear-ai-backup')) document.body.appendChild(btn);
-        updateLogic();
+        try {
+            if (document.body && !document.getElementById('clear-ai-backup')) {
+                document.body.appendChild(btn);
+            }
+            updateLogic();
+        } catch (e) {
+            console.warn(LOG_PREFIX, 'Periodic update failed:', e.message);
+        }
     }, 1500);
 
     // Warnung vor Tab-Schließen
     window.addEventListener('beforeunload', (e) => {
-        const field = getInputField();
-        const text = field ? getFieldText(field) : "";
-        if (text && text.trim().length > 0) {
-            e.preventDefault();
-            e.returnValue = '';
+        try {
+            const field = getInputField();
+            const text = field ? getFieldText(field) : "";
+            if (text && text.trim().length > 0) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        } catch (err) {
+            // Fail silently during unload — browser is closing anyway
         }
     });
 })();
