@@ -752,7 +752,6 @@
                 );
 
                 setFieldText(field, savedText);
-                field.dispatchEvent(new Event('input', { bubbles: true }));
                 field.focus();
 
                 if (isTextarea(field)) {
@@ -785,6 +784,8 @@
                         // Cursor restore failed — field content is still intact
                     }
                 }
+                // dispatchEvent AFTER cursor positioning so saveAction captures correct position
+                field.dispatchEvent(new Event('input', { bubbles: true }));
                 field.dataset.restored = "true";
             } catch (e) {
                 console.warn(LOG_PREFIX, 'Restore failed:', e.message);
