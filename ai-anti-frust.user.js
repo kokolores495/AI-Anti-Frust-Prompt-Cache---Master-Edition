@@ -197,8 +197,9 @@
             const saveAction = () => {
                 const text = getFieldText(field);
                 if (text.trim().length > 0) {
-                    safeStorageSet(STORAGE_KEY, text);
-                    safeStorageSet(CURSOR_KEY, getCursorPosition(field));
+                    if (safeStorageSet(STORAGE_KEY, text)) {
+                        safeStorageSet(CURSOR_KEY, getCursorPosition(field));
+                    }
                 } else {
                     clearBackup();
                 }
