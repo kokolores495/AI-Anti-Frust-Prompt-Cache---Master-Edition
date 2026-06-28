@@ -693,6 +693,49 @@
 
         if (!field) return;
 
+        // BACKUP LOGIK (Event Binding) — must run before pending prompt
+        // injection so the input event handler exists when injectPendingPrompt
+        // dispatches its synthetic input event.
+        if (!field.dataset.backupBound) {
+            const saveAction = () => {
+                try {
+                    const text = getFieldText(field);
+                    if (text && text.trim().length > 0) {
+                        if (backupStorageSet(STORAGE_KEY, text)) {
+                            backupStorageSet(CURSOR_KEY, getCursorPosition(field));
+                        }
+                    } else {
+                        clearBackup();
+                    }
+                    updateLogic();
+                } catch (e) {
+                    console.warn(LOG_PREFIX, 'Backup save failed:', e.message);
+                }
+            };
+            field.addEventListener('input', saveAction);
+            field.addEventListener('click', saveAction);
+            field.addEventListener('keyup', saveAction);
+
+            // Cleanup nach Absenden + History capture
+            field.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    try {
+                        const promptText = getFieldText(field);
+                        if (promptText && promptText.trim()) {
+                            addPromptToHistory(promptText);
+                        }
+                    } catch (err) {
+                        console.warn(LOG_PREFIX, 'History capture failed:', err.message);
+                    }
+                    setTimeout(() => {
+                        clearBackup();
+                        resetFieldState(field);
+                    }, 800);
+                }
+            });
+            field.dataset.backupBound = "true";
+        }
+
         // Pending prompt injection (only when no backup to restore)
         if (!hasBackup && !field.dataset.pendingHandled) {
             injectPendingPrompt(field);
@@ -745,47 +788,6 @@
             } catch (e) {
                 console.warn(LOG_PREFIX, 'Restore failed:', e.message);
             }
-        }
-
-        // BACKUP LOGIK (Event Binding)
-        if (!field.dataset.backupBound) {
-            const saveAction = () => {
-                try {
-                    const text = getFieldText(field);
-                    if (text && text.trim().length > 0) {
-                        if (backupStorageSet(STORAGE_KEY, text)) {
-                            backupStorageSet(CURSOR_KEY, getCursorPosition(field));
-                        }
-                    } else {
-                        clearBackup();
-                    }
-                    updateLogic();
-                } catch (e) {
-                    console.warn(LOG_PREFIX, 'Backup save failed:', e.message);
-                }
-            };
-            field.addEventListener('input', saveAction);
-            field.addEventListener('click', saveAction);
-            field.addEventListener('keyup', saveAction);
-
-            // Cleanup nach Absenden + History capture
-            field.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    try {
-                        const promptText = getFieldText(field);
-                        if (promptText && promptText.trim()) {
-                            addPromptToHistory(promptText);
-                        }
-                    } catch (err) {
-                        console.warn(LOG_PREFIX, 'History capture failed:', err.message);
-                    }
-                    setTimeout(() => {
-                        clearBackup();
-                        resetFieldState(field);
-                    }, 800);
-                }
-            });
-            field.dataset.backupBound = "true";
         }
     }
 
