@@ -9,6 +9,8 @@
 // @match        https://claude.ai/*
 // @match        https://grok.com/*
 // @grant        GM_addStyle
+// @noframes
+// @connect      none
 // @run-at       document-end
 // ==/UserScript==
 
@@ -65,12 +67,12 @@
     }
 
     function clearBackup() {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem(CURSOR_KEY);
+        safeStorageRemove(STORAGE_KEY);
+        safeStorageRemove(CURSOR_KEY);
     }
 
     function resetFieldState(field) {
-        field.dataset.restored = "false";
+        delete field.dataset.restored;
         updateLogic();
     }
 
@@ -112,10 +114,37 @@
         return null;
     }
 
+    function clampCursorPos(pos, text) {
+        if (typeof pos !== 'number' || isNaN(pos) || pos < 0) return 0;
+        return Math.min(pos, text.length);
+    }
+
+    function safeStorageGet(key) {
+        try { return localStorage.getItem(key); }
+        catch (_) { return null; }
+    }
+
+    function safeStorageSet(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            btn.style.removeProperty('background');
+            btn.title = '';
+            return true;
+        } catch (_) {
+            btn.style.setProperty('background', '#ff8c00', 'important');
+            btn.title = 'Speicher voll – Backup konnte nicht gesichert werden!';
+            return false;
+        }
+    }
+
+    function safeStorageRemove(key) {
+        try { localStorage.removeItem(key); }
+        catch (_) { /* access denied */ }
+    }
+
     function updateLogic() {
         const field = getInputField();
-        const savedText = localStorage.getItem(STORAGE_KEY);
-        const savedPos = parseInt(localStorage.getItem(CURSOR_KEY) || "0");
+        const savedText = safeStorageGet(STORAGE_KEY);
         const hasBackup = !!(savedText && savedText.trim().length > 0);
 
         btn.style.setProperty('display', hasBackup ? 'flex' : 'none', 'important');
@@ -123,6 +152,11 @@
 
         // RESTORE LOGIK
         if (hasBackup && getFieldText(field).trim() === "" && !field.dataset.restored) {
+            const savedPos = clampCursorPos(
+                parseInt(safeStorageGet(CURSOR_KEY) || "0", 10),
+                savedText
+            );
+
             setFieldText(field, savedText);
             field.dispatchEvent(new Event('input', { bubbles: true }));
             field.focus();
@@ -131,25 +165,29 @@
                 field.setSelectionRange(savedPos, savedPos);
             } else {
                 // Cursor-Wiederherstellung für ContentEditable (DOM Walker)
-                const range = document.createRange();
-                const sel = window.getSelection();
-                let charCount = 0, nodeStack = [field], found = false;
-                while (nodeStack.length > 0 && !found) {
-                    let node = nodeStack.pop();
-                    if (node.nodeType === 3) {
-                        const nextCount = charCount + node.length;
-                        if (savedPos <= nextCount) {
-                            range.setStart(node, savedPos - charCount);
-                            range.collapse(true);
-                            found = true;
+                try {
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    let charCount = 0, nodeStack = [field], found = false;
+                    while (nodeStack.length > 0 && !found) {
+                        let node = nodeStack.pop();
+                        if (node.nodeType === 3) {
+                            const nextCount = charCount + node.length;
+                            if (savedPos <= nextCount) {
+                                range.setStart(node, savedPos - charCount);
+                                range.collapse(true);
+                                found = true;
+                            }
+                            charCount = nextCount;
+                        } else {
+                            for (let i = node.childNodes.length - 1; i >= 0; i--) nodeStack.push(node.childNodes[i]);
                         }
-                        charCount = nextCount;
-                    } else {
-                        for (let i = node.childNodes.length - 1; i >= 0; i--) nodeStack.push(node.childNodes[i]);
                     }
+                    if (!found) range.selectNodeContents(field), range.collapse(false);
+                    sel.removeAllRanges(); sel.addRange(range);
+                } catch (_) {
+                    // Cursor restore failed — field content is still intact
                 }
-                if (!found) range.selectNodeContents(field), range.collapse(false);
-                sel.removeAllRanges(); sel.addRange(range);
             }
             field.dataset.restored = "true";
         }
@@ -159,8 +197,9 @@
             const saveAction = () => {
                 const text = getFieldText(field);
                 if (text.trim().length > 0) {
-                    localStorage.setItem(STORAGE_KEY, text);
-                    localStorage.setItem(CURSOR_KEY, getCursorPosition(field));
+                    if (safeStorageSet(STORAGE_KEY, text)) {
+                        safeStorageSet(CURSOR_KEY, getCursorPosition(field));
+                    }
                 } else {
                     clearBackup();
                 }
