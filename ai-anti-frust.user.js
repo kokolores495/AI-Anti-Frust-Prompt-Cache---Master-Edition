@@ -336,14 +336,22 @@
     function safeStorageSet(key, value) {
         try {
             localStorage.setItem(key, value);
-            btn.style.removeProperty('background');
-            btn.title = '';
             return true;
         } catch (_) {
-            btn.style.setProperty('background', '#ff8c00', 'important');
-            btn.title = 'Speicher voll \u2013 Backup konnte nicht gesichert werden!';
             return false;
         }
+    }
+
+    function backupStorageSet(key, value) {
+        const ok = safeStorageSet(key, value);
+        if (ok) {
+            btn.style.removeProperty('background');
+            btn.title = '';
+        } else {
+            btn.style.setProperty('background', '#ff8c00', 'important');
+            btn.title = 'Speicher voll \u2013 Backup konnte nicht gesichert werden!';
+        }
+        return ok;
     }
 
     function safeStorageRemove(key) {
@@ -587,6 +595,7 @@
             newChatBtn.addEventListener('click', function () {
                 const url = getNewChatUrl();
                 if (url) {
+                    skipBeforeUnload = true;
                     safeStorageSet(PENDING_PROMPT_KEY, entry.text);
                     window.location.href = url;
                 }
@@ -597,7 +606,10 @@
             deleteBtn.textContent = 'Delete';
             deleteBtn.addEventListener('click', function () {
                 const h = loadHistory();
-                h.splice(idx, 1);
+                const matchIdx = h.findIndex(function (item) {
+                    return item.ts === entry.ts && item.text === entry.text;
+                });
+                if (matchIdx !== -1) h.splice(matchIdx, 1);
                 saveHistory(h);
                 renderHistoryOverlay();
             });
@@ -741,8 +753,8 @@
                 try {
                     const text = getFieldText(field);
                     if (text && text.trim().length > 0) {
-                        if (safeStorageSet(STORAGE_KEY, text)) {
-                            safeStorageSet(CURSOR_KEY, getCursorPosition(field));
+                        if (backupStorageSet(STORAGE_KEY, text)) {
+                            backupStorageSet(CURSOR_KEY, getCursorPosition(field));
                         }
                     } else {
                         clearBackup();
@@ -813,7 +825,9 @@
     }, 1500);
 
     // Warnung vor Tab-Schließen
+    let skipBeforeUnload = false;
     window.addEventListener('beforeunload', (e) => {
+        if (skipBeforeUnload) return;
         try {
             const field = getInputField();
             const text = field ? getFieldText(field) : "";
