@@ -291,4 +291,16 @@
             // Fail silently during unload — browser is closing anyway
         }
     });
+
+    // Conditional export for testing (no-op in browser)
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            isTextarea,
+            getFieldText,
+            clampCursorPos,
+            getCursorPosition,
+            setNativeValue,
+            getInputField
+        };
+    }
 })();
