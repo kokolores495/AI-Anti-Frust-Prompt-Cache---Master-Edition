@@ -46,7 +46,35 @@
     btn.id = 'clear-ai-backup';
     btn.textContent = '🗑️';
 
-    // Hilfsfunktion: Setzt Werte so, dass React/Vue sie erkennt (Trigger State Update)
+    // --- Shared Utilities ---
+
+    function isTextarea(el) {
+        return el.tagName === 'TEXTAREA';
+    }
+
+    function getFieldText(field) {
+        return isTextarea(field) ? field.value : field.innerText;
+    }
+
+    function setFieldText(field, text) {
+        if (isTextarea(field)) {
+            setNativeValue(field, text);
+        } else {
+            field.textContent = text;
+        }
+    }
+
+    function clearBackup() {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(CURSOR_KEY);
+    }
+
+    function resetFieldState(field) {
+        field.dataset.restored = "false";
+        updateLogic();
+    }
+
+    // Setzt Werte so, dass React/Vue sie erkennt (Trigger State Update)
     function setNativeValue(element, value) {
         const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
         const prototype = Object.getPrototypeOf(element);
@@ -61,9 +89,9 @@
         }
     }
 
-    // Hilfsfunktion: Berechnet die absolute Cursor-Position im Text
+    // Berechnet die absolute Cursor-Position im Text
     function getCursorPosition(el) {
-        if (el.tagName === 'TEXTAREA') return el.selectionStart;
+        if (isTextarea(el)) return el.selectionStart;
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
@@ -94,17 +122,14 @@
         if (!field) return;
 
         // RESTORE LOGIK
-        if (hasBackup && (field.innerText || field.value || "").trim() === "" && !field.dataset.restored) {
-            if (field.tagName === 'TEXTAREA') {
-                setNativeValue(field, savedText);
-                field.dispatchEvent(new Event('input', { bubbles: true }));
-                field.focus();
+        if (hasBackup && getFieldText(field).trim() === "" && !field.dataset.restored) {
+            setFieldText(field, savedText);
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            field.focus();
+
+            if (isTextarea(field)) {
                 field.setSelectionRange(savedPos, savedPos);
             } else {
-                field.textContent = savedText; // Trusted-Types safe
-                field.dispatchEvent(new Event('input', { bubbles: true }));
-                field.focus();
-
                 // Cursor-Wiederherstellung für ContentEditable (DOM Walker)
                 const range = document.createRange();
                 const sel = window.getSelection();
@@ -132,13 +157,12 @@
         // BACKUP LOGIK (Event Binding)
         if (!field.dataset.backupBound) {
             const saveAction = () => {
-                const text = field.tagName === 'TEXTAREA' ? field.value : field.innerText;
+                const text = getFieldText(field);
                 if (text.trim().length > 0) {
                     localStorage.setItem(STORAGE_KEY, text);
                     localStorage.setItem(CURSOR_KEY, getCursorPosition(field));
                 } else {
-                    localStorage.removeItem(STORAGE_KEY);
-                    localStorage.removeItem(CURSOR_KEY);
+                    clearBackup();
                 }
                 updateLogic();
             };
@@ -150,10 +174,8 @@
             field.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     setTimeout(() => {
-                        localStorage.removeItem(STORAGE_KEY);
-                        localStorage.removeItem(CURSOR_KEY);
-                        field.dataset.restored = "false";
-                        updateLogic();
+                        clearBackup();
+                        resetFieldState(field);
                     }, 800);
                 }
             });
@@ -164,16 +186,15 @@
     btn.onclick = (e) => {
         e.preventDefault();
         if (confirm("Backup-Speicher wirklich leeren?")) {
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(CURSOR_KEY);
+            clearBackup();
             const field = getInputField();
             if (field) {
-                if (field.tagName === 'TEXTAREA') field.value = "";
-                else field.textContent = "";
-                field.dataset.restored = "false";
+                setFieldText(field, "");
                 field.focus();
+                resetFieldState(field);
+            } else {
+                updateLogic();
             }
-            updateLogic();
         }
     };
 
@@ -186,7 +207,7 @@
     // Warnung vor Tab-Schließen
     window.addEventListener('beforeunload', (e) => {
         const field = getInputField();
-        const text = field ? (field.tagName === 'TEXTAREA' ? field.value : field.innerText) : "";
+        const text = field ? getFieldText(field) : "";
         if (text && text.trim().length > 0) {
             e.preventDefault();
             e.returnValue = '';
