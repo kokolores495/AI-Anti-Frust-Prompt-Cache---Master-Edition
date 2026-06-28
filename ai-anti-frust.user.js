@@ -72,7 +72,7 @@
     }
 
     function resetFieldState(field) {
-        field.dataset.restored = "false";
+        delete field.dataset.restored;
         updateLogic();
     }
 
@@ -125,8 +125,14 @@
     }
 
     function safeStorageSet(key, value) {
-        try { localStorage.setItem(key, value); }
-        catch (_) { /* quota exceeded or access denied */ }
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (_) {
+            btn.style.setProperty('background', '#ff8c00', 'important');
+            btn.title = 'Speicher voll – Backup konnte nicht gesichert werden!';
+            return false;
+        }
     }
 
     function safeStorageRemove(key) {
