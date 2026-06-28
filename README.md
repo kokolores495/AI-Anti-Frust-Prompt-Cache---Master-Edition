@@ -64,6 +64,27 @@ Wenn ein [Release](https://github.com/kokolores495/AI-Anti-Frust-Prompt-Cache---
 
 ---
 
+### ⚙️ Options Menu & Prompt History (Neu in v8.5)
+
+**Settings / Options Menu**
+Ein Zahnrad-Icon (⚙️) erscheint oben rechts neben dem Backup-Lösch-Button. Beim Klick öffnet sich ein Panel mit folgenden Einstellungen:
+* **Show prompt history icon** – Blendet das Verlaufs-Icon ein/aus.
+* **Show settings icon** – Blendet das Zahnrad-Icon ein/aus (erst entdeckbar, dann ausblendbar).
+* **Max history entries** – Maximale Anzahl gespeicherter Prompts (1–500).
+
+**Prompt History Overlay**
+Ein Verlaufs-Icon (📜) öffnet ein Overlay mit allen gespeicherten Prompts (neueste zuerst). Jeder Eintrag zeigt Zeitstempel, Host und eine Vorschau. Aktionen pro Eintrag:
+* **Copy** – Kopiert den vollen Prompt-Text in die Zwischenablage.
+* **New chat** – Startet einen neuen Chat auf der aktuellen Plattform und füllt den Prompt automatisch ein (ohne abzusenden).
+* **Delete** – Entfernt den einzelnen Eintrag aus dem Verlauf.
+* **Clear all history** – Löscht den gesamten Verlauf.
+
+Prompts werden automatisch beim Absenden (Enter) erfasst. Die bestehende Backup/Restore-Funktionalität bleibt vollständig erhalten.
+
+---
+
+### ⚡ Performance & Sicherheit
+
 ## Features
 
 | Feature | Beschreibung |
