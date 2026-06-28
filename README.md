@@ -76,3 +76,31 @@ Dieses Projekt steht unter der **MIT-Lizenz**.
 
 ### 👨‍💻 Für Entwickler
 Wenn du das Skript erweitern willst, beachte die `setNativeValue` Funktion – sie ist der Schlüssel, um die Framework-Hürden von React und Vue zu nehmen.
+
+---
+
+### 🧪 Development & Testing
+
+**Voraussetzungen:** Node.js (LTS)
+
+```bash
+# Abhängigkeiten installieren
+npm install
+
+# Linting ausführen
+npm run lint
+
+# Unit-Tests ausführen
+npm test
+
+# UserScript-Metadaten validieren
+npm run validate:meta
+```
+
+**Releases erstellen:**
+
+1. Erstelle einen Git-Tag mit Versionspräfix: `git tag v8.4`
+2. Pushe den Tag: `git push origin v8.4`
+3. Die GitHub Actions Release-Pipeline führt automatisch alle Checks aus und erstellt ein Release mit `ai-anti-frust.user.js` als Download-Asset.
+
+**CI/CD:** Jeder Push und Pull-Request auf `main` löst automatisch Linting, Metadaten-Validierung und Unit-Tests aus.
