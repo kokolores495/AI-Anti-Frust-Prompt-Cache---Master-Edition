@@ -127,6 +127,8 @@
     function safeStorageSet(key, value) {
         try {
             localStorage.setItem(key, value);
+            btn.style.removeProperty('background');
+            btn.title = '';
             return true;
         } catch (_) {
             btn.style.setProperty('background', '#ff8c00', 'important');
