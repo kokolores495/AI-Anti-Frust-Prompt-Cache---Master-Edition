@@ -596,6 +596,7 @@
                 const url = getNewChatUrl();
                 if (url) {
                     skipBeforeUnload = true;
+                    clearBackup();
                     safeStorageSet(PENDING_PROMPT_KEY, entry.text);
                     window.location.href = url;
                 }
