@@ -567,7 +567,7 @@
             return;
         }
 
-        history.forEach(function (entry, idx) {
+        history.forEach(function (entry) {
             const div = document.createElement('div');
             div.className = 'ai-history-entry';
 
